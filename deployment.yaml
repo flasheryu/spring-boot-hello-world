@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations: {}
+  labels:
+    app: spring-boot-hello-world
+  name: spring-boot-hello-world
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spring-boot-hello-world
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: spring-boot-hello-world
+    spec:
+      containers:
+      - command:
+        - java
+        - -Xms2g
+        - -Xmx2g
+        - -XX:+UseG1GC
+        - -XX:MaxGCPauseMillis=200
+        - -javaagent:/agent/opentelemetry-javaagent.jar
+        - -Dotel.javaagent.debug=true
+        - -jar
+        - /app.jar
+        env:
+        - name: OTEL_SERVICE_NAME
+          value: spring-boot-hello-world
+        - name: OTEL_TRACES_EXPORTER
+          value: otlp
+        - name: OTEL_METRICS_EXPORTER
+          value: otlp
+        - name: OTEL_LOGS_EXPORTER
+          value: none
+        - name: OTEL_EXPORTER_OTLP_PROTOCOL
+          value: grpc
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://open-telemetry-opentelemetry-collector.monitoring:4317
+        - name: OTEL_TRACES_SAMPLER
+          value: parentbased_traceidratio
+        - name: OTEL_TRACES_SAMPLER_ARG
+          value: "0.01"
+        image: flasheryu/spring-boot-hello-world
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 3
+          initialDelaySeconds: 150
+          periodSeconds: 5
+          successThreshold: 1
+          tcpSocket:
+            port: 8080
+          timeoutSeconds: 1
+        name: spring-boot-hello-world
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          initialDelaySeconds: 150
+          periodSeconds: 5
+          successThreshold: 1
+          tcpSocket:
+            port: 8080
+          timeoutSeconds: 1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 2Gi
+      restartPolicy: Always
